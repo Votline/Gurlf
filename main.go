@@ -5,6 +5,8 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	"gurlf/internal/core"
 )
 
 func initLogger(d *bool) *zap.Logger {
@@ -36,6 +38,8 @@ func main() {
 	}
 	f := args[0]
 
-	log.Debug("file", zap.String("f", f))
-
+	c := core.New(f, log)
+	if err := c.Start(); err != nil {
+		log.Error("core error", zap.Error(err))
+	}
 }
