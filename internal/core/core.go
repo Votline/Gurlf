@@ -9,8 +9,9 @@ import (
 
 type core struct {
 	fileName string
-	log *zap.Logger
+	log      *zap.Logger
 }
+
 func New(f string, l *zap.Logger) *core {
 	return &core{fileName: f, log: l}
 }

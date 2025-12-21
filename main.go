@@ -15,9 +15,12 @@ func initLogger(d *bool) *zap.Logger {
 	cfg.EncoderConfig.TimeKey = ""
 	cfg.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	cfg.DisableStacktrace = true
-	
+	cfg.EncoderConfig.ConsoleSeparator = " | "
+
 	lvl := zapcore.ErrorLevel
-	if *d {lvl = zapcore.DebugLevel}
+	if *d {
+		lvl = zapcore.DebugLevel
+	}
 	cfg.Level = zap.NewAtomicLevelAt(lvl)
 
 	log, _ := cfg.Build()
@@ -28,7 +31,7 @@ func initLogger(d *bool) *zap.Logger {
 func main() {
 	d := flag.Bool("debug", false, "use for debug mode")
 	flag.Parse()
-	
+
 	log := initLogger(d)
 
 	args := flag.Args()
