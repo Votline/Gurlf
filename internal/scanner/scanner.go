@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"time"
 
 	"go.uber.org/zap"
 )
@@ -26,9 +27,25 @@ func Scan(p string, log *zap.Logger) ([]byte, error) {
 	}
 
 	for i, cfg := range cfgs {
-		log.Debug("configs!",
-			zap.Int("№", i),
-			zap.String("cfg", string(cfg)))
+		var (
+			err error
+			k []byte
+			v []byte
+			conEnd int
+		)
+		for err == nil {
+			k, v, conEnd, err = findKeyValue(cfg)
+			log.Debug("configs!",
+				zap.Int("№", i),
+				zap.String("key", string(k)),
+				zap.String("value", string(v)))
+			cfg = cfg[conEnd:]
+			time.Sleep(10*time.Millisecond)
+		}
+
+		log.Warn("find key value err",
+			zap.String("op", op),
+			zap.Error(err))
 	}
 
 	return nil, nil
@@ -83,4 +100,27 @@ func findEnd(n string, d []byte) (contentEnd int, totalConsumed int, err error) 
 	}
 
 	return idx, idx + len(pattern), nil
+}
+
+func findKeyValue(d []byte) (key []byte, value []byte, contentEnd int, err error) {
+	const op = "scanner.findKeyValue"
+
+	start := bytes.Index(d, []byte(":"))
+	if start == -1 {
+		return nil, nil, 0, fmt.Errorf("%s: start idx: no key value start", op)
+	}
+	key = d[:start]
+	start++
+
+	for start < len(d) && d[start] == ' ' {
+		start++
+	}
+
+	end := bytes.Index(d[start:], []byte("\n"))
+	if end == -1 {
+		return nil, nil, 0, fmt.Errorf("%s: end idx: no value end", op)
+	}
+	value = d[start:end+start]
+
+	return key, value, end+start, nil
 }
