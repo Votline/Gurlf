@@ -52,6 +52,8 @@ func findConfigs(d []byte, emit func([]byte) error) error {
 		name, conStart, err := findStart(d)
 		if err != nil {
 			return fmt.Errorf("%s: start idx: %w", op, err)
+		} else if name == nil {
+			return nil
 		}
 
 		conEnd, totalConsumed, err := findEnd(name, d[conStart:])
@@ -71,6 +73,10 @@ func findConfigs(d []byte, emit func([]byte) error) error {
 
 func findStart(d []byte) (name []byte, nextIdx int, err error) {
 	const op = "scanner.findName"
+
+	if bytes.TrimSpace(d) == nil {
+		return nil, 0, nil
+	}
 
 	start := bytes.IndexByte(d, byte('['))
 	if start == -1 {
@@ -109,7 +115,7 @@ func findKeyValue(d []byte) (key []byte, value []byte, contentEnd int, err error
 	if start == -1 {
 		return nil, nil, 0, fmt.Errorf("%s: start idx: no key value start", op)
 	}
-	key = d[:start]
+	key = bytes.TrimSpace(d[:start])
 	start++
 
 	for start < len(d) && d[start] == ' ' {
