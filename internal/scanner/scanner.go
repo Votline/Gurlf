@@ -8,7 +8,18 @@ import (
 	"go.uber.org/zap"
 )
 
-func Scan(p string, log *zap.Logger) ([]byte, error) {
+type Entry struct{
+	KeyStart, KeyEnd int
+	ValueStart, ValueEnd int
+}
+
+type Config struct{
+	Name []byte
+	RawData []byte
+	Entries []Entry
+}
+
+func Scan(p string, log *zap.Logger) ([]Config, error) {
 	const op = "scanner.Scan"
 
 	d, err := os.ReadFile(p)
@@ -16,59 +27,87 @@ func Scan(p string, log *zap.Logger) ([]byte, error) {
 		return nil, fmt.Errorf("%s: read file: %w", op, err)
 	}
 
-	if err := processFile(d, log); err != nil {
+	cfgs, err := processFile(d, log)
+	if err != nil {
 		return nil, fmt.Errorf("%s: process file: %w", op, err)
 	}
 
-	return nil, nil
+	return cfgs, nil
 }
 
-func processFile(d []byte, log *zap.Logger) error {
+func processFile(d []byte, log *zap.Logger) ([]Config, error) {
 	const op = "scanner.processFile"
-	if err := findConfigs(d, func(cfgData []byte) error {
+	cfgs, err := findConfigs(d, func(cfgData []byte) ([]Entry, error) {
+		offset := 0
 		curr := cfgData
+		var enrs []Entry
 		for len(curr) > 0 {
-			k, v, consumed, err := findKeyValue(curr)
+			kS, kE, vS, vE, consumed, err := findKeyValue(curr)
 			if err != nil {
 				break
 			}
 
-			log.Debug("found pair",
-				zap.String("string", string(k)),
-				zap.String("value", string(v)))
+			enrs = append(enrs, Entry{
+				KeyStart: kS + offset, KeyEnd: kE + offset,
+				ValueStart: vS + offset, ValueEnd: vE + offset,
+			})
+
 			curr = curr[consumed:]
+			offset += consumed
+
+			log.Debug("extracted indexes",
+				zap.String("op", op),
+				zap.Int("key start", kS),
+				zap.Int("key end", kE),
+				zap.Int("value start", vS),
+				zap.Int("value end", vE),
+				zap.Int("consumed", consumed))
 		}
-		return nil
-	}); err != nil {
-		return fmt.Errorf("%s: find configs: %w", op, err)
+		return enrs, nil
+	}, log)
+	if err != nil {
+		return nil, fmt.Errorf("%s: find configs: %w", op, err)
 	}
-	return nil
+	return cfgs, nil
 }
 
-func findConfigs(d []byte, emit func([]byte) error) error {
+func findConfigs(d []byte, emit func([]byte) ([]Entry, error), log *zap.Logger) ([]Config, error) {
 	const op = "scanner.findConfigs"
+
+	var cfgs []Config
 
 	for len(d) > 0 {
 		name, conStart, err := findStart(d)
 		if err != nil {
-			return fmt.Errorf("%s: start idx: %w", op, err)
+			return cfgs, fmt.Errorf("%s: start idx: %w", op, err)
 		} else if name == nil {
-			return nil
+			return cfgs, nil
 		}
 
 		conEnd, totalConsumed, err := findEnd(name, d[conStart:])
 		if err != nil {
-			return fmt.Errorf("%s: end idx: %w", op, err)
+			return cfgs, fmt.Errorf("%s: end idx: %w", op, err)
 		}
 
-		if err := emit(d[conStart : conStart+conEnd]); err != nil {
-			return fmt.Errorf("%s: emit func: %w", op, err)
+		enrs, err := emit(d[conStart : conStart+conEnd])
+		if err != nil {
+			return cfgs, fmt.Errorf("%s: emit func: %w", op, err)
 		}
+
+		var cfg Config
+		cfg.Name = name
+		cfg.RawData = d[conStart : conStart+conEnd]
+		cfg.Entries = enrs
+		cfgs = append(cfgs, cfg)
+
+		log.Debug("new config",
+			zap.Int("len data", len(cfg.RawData)),
+			zap.Int("len entries", len(cfg.Entries)))
 
 		d = d[conStart+totalConsumed:]
 	}
 
-	return nil
+	return cfgs, nil
 }
 
 func findStart(d []byte) (name []byte, nextIdx int, err error) {
@@ -108,14 +147,21 @@ func findEnd(n []byte, d []byte) (contentEnd int, totalConsumed int, err error) 
 	return idx, idx + len(pattern), nil
 }
 
-func findKeyValue(d []byte) (key []byte, value []byte, contentEnd int, err error) {
+func findKeyValue(d []byte) (keyS, keyE, valS, valE int, contentEnd int, err error) {
 	const op = "scanner.findKeyValue"
 
 	start := bytes.Index(d, []byte(":"))
 	if start == -1 {
-		return nil, nil, 0, fmt.Errorf("%s: start idx: no key value start", op)
+		return 0, 0, 0, 0, 0, fmt.Errorf("%s: start idx: no key value start", op)
 	}
-	key = bytes.TrimSpace(d[:start])
+	seg := d[:start]
+	keyS = bytes.IndexFunc(seg, func(r rune) bool {
+		return !isSpace(r)
+	})
+	last := bytes.LastIndexFunc(seg, func(r rune) bool {
+		return !isSpace(r)
+	})
+	keyE = last+1
 	start++
 
 	for start < len(d) && d[start] == ' ' {
@@ -124,9 +170,14 @@ func findKeyValue(d []byte) (key []byte, value []byte, contentEnd int, err error
 
 	end := bytes.Index(d[start:], []byte("\n"))
 	if end == -1 {
-		return nil, nil, 0, fmt.Errorf("%s: end idx: no value end", op)
+		return 0, 0, 0, 0, 0, fmt.Errorf("%s: end idx: no value end", op)
 	}
-	value = d[start : end+start]
+	valS = start
+	valE = end+start
 
-	return key, value, end + start, nil
+	return  keyS, keyE, valS, valE, end + start + 1, nil
+}
+
+func isSpace(r rune) bool {
+    return r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '\v' || r == '\f'
 }

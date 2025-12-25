@@ -28,7 +28,7 @@ func (c *core) Start() error {
 	}
 
 	c.log.Debug("scan complete",
-		zap.Int("bytes read", len(data)))
+		zap.Int("configs length", len(data)))
 
 	return nil
 }
