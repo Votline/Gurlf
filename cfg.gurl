@@ -1,7 +1,9 @@
 [the_first_config]
 ID: 1
 HEADERS: Content-type: application/json
-BODY: `{key: {value}}`
+BODY: `{
+	key: {value}
+}`
 [\the_first_config]
 
 [the_first_config]
