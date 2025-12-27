@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+	"strconv"
 
 	"gurlf/internal/scanner"
 
@@ -33,18 +34,19 @@ func (c *core) Start() error {
 	c.log.Debug("scan complete",
 		zap.Int("configs length", len(data)))
 
-	cfg := struct {
-		ID   []byte `gurlf:"ID"`
-		Body []byte `gurlf:"BODY"`
-	}{}
-	if err := c.Unmarshal(data[0], &cfg); err != nil {
-		return fmt.Errorf("%s: unmarshal data: %w", op, err)
+	for i := range len(data) {
+		cfg := struct {
+			ID   int    `gurlf:"ID"`
+			Body string `gurlf:"BODY"`
+			Headers string `gurlf:"HEADERS"`
+		}{}
+		if err := c.Unmarshal(data[i], &cfg); err != nil {
+			return fmt.Errorf("%s: unmarshal data: %w", op, err)
+		}
+
+		fmt.Printf("\nID: %d | Body: %s | Headers: %s\n", cfg.ID, cfg.Body, cfg.Headers)
+
 	}
-
-	c.log.Debug("extracted values",
-		zap.String("id", string(cfg.ID)),
-		zap.String("body", string(cfg.Body)))
-
 	return nil
 }
 
@@ -72,7 +74,25 @@ func (c *core) Unmarshal(d scanner.Data, v any) error {
 		val := d.RawData[ent.ValStart:ent.ValEnd]
 
 		if idx, ok := cache[key]; ok {
-			rv.Field(idx).SetBytes(bytes.TrimSpace(val))
+			f := rv.Field(idx)
+			val = bytes.TrimSpace(val)
+
+			switch f.Kind() {
+			case reflect.String:
+				f.SetString(string(val))
+			case reflect.Int, reflect.Int64:
+				i, err := strconv.ParseInt(string(val), 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s: cannot parse int: %w", op, err)
+				}
+				f.SetInt(int64(i))
+			case reflect.Slice:
+				if f.Type().Elem().Kind() == reflect.Uint8 {
+					f.SetBytes(val)
+				}
+			default:
+				return fmt.Errorf("%s: unsupported type: %v", op, f.Kind())
+			}
 		}
 	}
 
