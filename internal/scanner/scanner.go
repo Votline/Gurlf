@@ -9,17 +9,17 @@ import (
 )
 
 type Entry struct {
-	KeyStart, KeyEnd     int
-	ValueStart, ValueEnd int
+	KeyStart, KeyEnd int
+	ValStart, ValEnd int
 }
 
-type Config struct {
+type Data struct {
 	Name    []byte
 	RawData []byte
 	Entries []Entry
 }
 
-func Scan(p string, log *zap.Logger) ([]Config, error) {
+func Scan(p string, log *zap.Logger) ([]Data, error) {
 	const op = "scanner.Scan"
 
 	d, err := os.ReadFile(p)
@@ -35,7 +35,7 @@ func Scan(p string, log *zap.Logger) ([]Config, error) {
 	return cfgs, nil
 }
 
-func processFile(d []byte, log *zap.Logger) ([]Config, error) {
+func processFile(d []byte, log *zap.Logger) ([]Data, error) {
 	const op = "scanner.processFile"
 	cfgs, err := findConfigs(d, func(cfgData []byte) ([]Entry, error) {
 		offset := 0
@@ -49,7 +49,7 @@ func processFile(d []byte, log *zap.Logger) ([]Config, error) {
 
 			enrs = append(enrs, Entry{
 				KeyStart: kS + offset, KeyEnd: kE + offset,
-				ValueStart: vS + offset, ValueEnd: vE + offset,
+				ValStart: vS + offset, ValEnd: vE + offset,
 			})
 
 			curr = curr[consumed:]
@@ -71,10 +71,10 @@ func processFile(d []byte, log *zap.Logger) ([]Config, error) {
 	return cfgs, nil
 }
 
-func findConfigs(d []byte, emit func([]byte) ([]Entry, error), log *zap.Logger) ([]Config, error) {
+func findConfigs(d []byte, emit func([]byte) ([]Entry, error), log *zap.Logger) ([]Data, error) {
 	const op = "scanner.findConfigs"
 
-	var cfgs []Config
+	var cfgs []Data
 
 	for len(d) > 0 {
 		name, conStart, err := findStart(d)
@@ -94,7 +94,7 @@ func findConfigs(d []byte, emit func([]byte) ([]Entry, error), log *zap.Logger) 
 			return cfgs, fmt.Errorf("%s: emit func: %w", op, err)
 		}
 
-		var cfg Config
+		var cfg Data
 		cfg.Name = name
 		cfg.RawData = d[conStart : conStart+conEnd]
 		cfg.Entries = enrs
@@ -186,7 +186,7 @@ func findKeyValue(d []byte) (keyS, keyE, valS, valE int, contentEnd int, err err
 		if lineEnd == -1 {
 			return keyS, keyE, valS, valE, vE + start, nil
 		}
-		
+
 		return keyS, keyE, valS, valE, valE + lineEnd, nil
 	}
 
