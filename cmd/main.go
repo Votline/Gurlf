@@ -2,11 +2,12 @@ package main
 
 import (
 	"flag"
+	"fmt"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	"gurlf/internal/core"
+	"github.com/Votline/Gurlf"
 )
 
 func initLogger(d *bool) *zap.Logger {
@@ -39,10 +40,23 @@ func main() {
 		log.Error("Specify the path to file")
 		return
 	}
-	f := args[0]
-
-	c := core.New(f, log)
-	if err := c.Start(); err != nil {
-		log.Error("core error", zap.Error(err))
+	p := args[0]
+	
+	data, err := gurlf.Scan(p)
+	if err != nil {
+		log.Error("Scan failed", zap.Error(err))
 	}
+
+	s := struct{
+		ID string `gurlf:"ID"`
+		Body string `gurlf:"BODY"`
+		Hdrs string `gurlf:"HEADERS"`
+	}{}
+
+	err = gurlf.Unmarshal(data[1], &s)
+	if err != nil {
+		log.Error("Unmarshal failed", zap.Error(err))
+	}
+
+	fmt.Printf("\n%s\n%s\n%s\n", s.ID, s.Body, s.Hdrs)
 }

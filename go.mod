@@ -1,4 +1,4 @@
-module gurlf
+module github.com/Votline/Gurlf
 
 go 1.25.5
 

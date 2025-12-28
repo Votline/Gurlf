@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-
-	"go.uber.org/zap"
 )
 
 type Entry struct {
@@ -19,7 +17,7 @@ type Data struct {
 	Entries []Entry
 }
 
-func Scan(p string, log *zap.Logger) ([]Data, error) {
+func Scan(p string) ([]Data, error) {
 	const op = "scanner.Scan"
 
 	d, err := os.ReadFile(p)
@@ -27,7 +25,7 @@ func Scan(p string, log *zap.Logger) ([]Data, error) {
 		return nil, fmt.Errorf("%s: read file: %w", op, err)
 	}
 
-	cfgs, err := processFile(d, log)
+	cfgs, err := processFile(d)
 	if err != nil {
 		return nil, fmt.Errorf("%s: process file: %w", op, err)
 	}
@@ -35,7 +33,7 @@ func Scan(p string, log *zap.Logger) ([]Data, error) {
 	return cfgs, nil
 }
 
-func processFile(d []byte, log *zap.Logger) ([]Data, error) {
+func processFile(d []byte) ([]Data, error) {
 	const op = "scanner.processFile"
 	cfgs, err := findConfigs(d, func(cfgData []byte) ([]Entry, error) {
 		offset := 0
@@ -54,24 +52,16 @@ func processFile(d []byte, log *zap.Logger) ([]Data, error) {
 
 			curr = curr[consumed:]
 			offset += consumed
-
-			log.Debug("extracted indexes",
-				zap.String("op", op),
-				zap.Int("key start", kS),
-				zap.Int("key end", kE),
-				zap.Int("value start", vS),
-				zap.Int("value end", vE),
-				zap.Int("consumed", consumed))
 		}
 		return enrs, nil
-	}, log)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("%s: find configs: %w", op, err)
 	}
 	return cfgs, nil
 }
 
-func findConfigs(d []byte, emit func([]byte) ([]Entry, error), log *zap.Logger) ([]Data, error) {
+func findConfigs(d []byte, emit func([]byte) ([]Entry, error)) ([]Data, error) {
 	const op = "scanner.findConfigs"
 
 	var cfgs []Data
@@ -99,10 +89,6 @@ func findConfigs(d []byte, emit func([]byte) ([]Entry, error), log *zap.Logger) 
 		cfg.RawData = d[conStart : conStart+conEnd]
 		cfg.Entries = enrs
 		cfgs = append(cfgs, cfg)
-
-		log.Debug("new config",
-			zap.Int("len data", len(cfg.RawData)),
-			zap.Int("len entries", len(cfg.Entries)))
 
 		d = d[conStart+totalConsumed:]
 	}

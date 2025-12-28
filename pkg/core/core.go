@@ -6,51 +6,10 @@ import (
 	"reflect"
 	"strconv"
 
-	"gurlf/internal/scanner"
-
-	"go.uber.org/zap"
+	"github.com/Votline/Gurlf/pkg/scanner"
 )
 
-type core struct {
-	fileName string
-	log      *zap.Logger
-}
-
-func New(f string, l *zap.Logger) *core {
-	return &core{fileName: f, log: l}
-}
-
-func (c *core) Start() error {
-	const op = "core.Start"
-
-	c.log.Debug("starting process",
-		zap.String("file", c.fileName))
-
-	data, err := scanner.Scan(c.fileName, c.log)
-	if err != nil {
-		return fmt.Errorf("%s: scan file: %w", op, err)
-	}
-
-	c.log.Debug("scan complete",
-		zap.Int("configs length", len(data)))
-
-	for i := range len(data) {
-		cfg := struct {
-			ID   int    `gurlf:"ID"`
-			Body string `gurlf:"BODY"`
-			Headers string `gurlf:"HEADERS"`
-		}{}
-		if err := c.Unmarshal(data[i], &cfg); err != nil {
-			return fmt.Errorf("%s: unmarshal data: %w", op, err)
-		}
-
-		fmt.Printf("\nID: %d | Body: %s | Headers: %s\n", cfg.ID, cfg.Body, cfg.Headers)
-
-	}
-	return nil
-}
-
-func (c *core) Unmarshal(d scanner.Data, v any) error {
+func Unmarshal(d scanner.Data, v any) error {
 	const op = "core.Unmarshal"
 
 	rv := reflect.ValueOf(v)
