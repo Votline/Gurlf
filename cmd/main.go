@@ -48,7 +48,7 @@ func main() {
 	}
 
 	s := struct{
-		ID string `gurlf:"ID"`
+		ID int `gurlf:"ID"`
 		Body string `gurlf:"BODY"`
 		Hdrs string `gurlf:"HEADERS"`
 	}{}

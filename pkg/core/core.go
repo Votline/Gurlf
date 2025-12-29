@@ -28,9 +28,15 @@ func Unmarshal(d scanner.Data, v any) error {
 		}
 	}
 
+	if len(cache) <= 0 {
+		return fmt.Errorf("%s: cache fields: zero fields", op)
+	}
+
 	for _, ent := range d.Entries {
 		key := string(d.RawData[ent.KeyStart:ent.KeyEnd])
 		val := d.RawData[ent.ValStart:ent.ValEnd]
+
+		fmt.Printf("key: %s\nval:%s\n", key, string(val))
 
 		if idx, ok := cache[key]; ok {
 			f := rv.Field(idx)
