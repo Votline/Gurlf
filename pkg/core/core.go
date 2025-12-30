@@ -36,8 +36,6 @@ func Unmarshal(d scanner.Data, v any) error {
 		key := string(d.RawData[ent.KeyStart:ent.KeyEnd])
 		val := d.RawData[ent.ValStart:ent.ValEnd]
 
-		fmt.Printf("key: %s\nval:%s\n", key, string(val))
-
 		if idx, ok := cache[key]; ok {
 			f := rv.Field(idx)
 			val = bytes.TrimSpace(val)

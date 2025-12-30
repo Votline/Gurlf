@@ -35,30 +35,31 @@ func Scan(p string) ([]Data, error) {
 
 func processFile(d []byte) ([]Data, error) {
 	const op = "scanner.processFile"
-	cfgs, err := findConfigs(d, func(cfgData []byte) ([]Entry, error) {
-		offset := 0
-		curr := cfgData
-		var enrs []Entry
-		for len(curr) > 0 {
-			kS, kE, vS, vE, consumed, err := findKeyValue(curr)
-			if err != nil {
-				break
-			}
-
-			enrs = append(enrs, Entry{
-				KeyStart: kS + offset, KeyEnd: kE + offset,
-				ValStart: vS + offset, ValEnd: vE + offset,
-			})
-
-			curr = curr[consumed:]
-			offset += consumed
-		}
-		return enrs, nil
-	})
+	cfgs, err := findConfigs(d, emit)
 	if err != nil {
 		return nil, fmt.Errorf("%s: find configs: %w", op, err)
 	}
 	return cfgs, nil
+}
+func emit(cfgData []byte) ([]Entry, error) {
+	offset := 0
+	curr := cfgData
+	var enrs []Entry
+	for len(curr) > 0 {
+		kS, kE, vS, vE, consumed, err := findKeyValue(curr)
+		if err != nil {
+			break
+		}
+
+		enrs = append(enrs, Entry{
+			KeyStart: kS + offset, KeyEnd: kE + offset,
+			ValStart: vS + offset, ValEnd: vE + offset,
+		})
+
+		curr = curr[consumed:]
+		offset += consumed
+	}
+	return enrs, nil
 }
 
 func findConfigs(d []byte, emit func([]byte) ([]Entry, error)) ([]Data, error) {

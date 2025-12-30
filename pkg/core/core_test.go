@@ -1,8 +1,10 @@
 package core
 
 import (
-	"github.com/Votline/Gurlf/pkg/scanner"
+	"fmt"
 	"testing"
+
+	"github.com/Votline/Gurlf/pkg/scanner"
 )
 
 func TestUnmarshal(t *testing.T) {
@@ -42,14 +44,21 @@ func TestUnmarshal(t *testing.T) {
 		t.Fatal("Unmarshal error: %w", err)
 	}
 
-	if res.ID != 12 {
-		t.Errorf("Expected: '12', received: %d", res.ID)
-	}
-	if res.User != "admin" {
-		t.Errorf("Expected: 'admin', received: %s", res.User)
-	}
-	if res.Enc != "console" {
-		t.Errorf("Expected: 'console', received: %s", res.Enc)
+	tests := []struct{
+		name string
+		actual string
+		expected string
+	}{
+		{"ID", fmt.Sprint(res.ID), "12"},
+		{"User", res.User, "admin"},
+		{"Enc", res.Enc, "console"},
 	}
 
+
+	for _, tt := range tests {
+		if tt.actual != tt.expected {
+			t.Errorf("%s: expected %s, got %s",
+				tt.name, tt.actual, tt.expected)
+		}
+	}
 }
