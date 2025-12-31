@@ -28,6 +28,14 @@ func Unmarshal(d scanner.Data, v any) error {
 		}
 	}
 
+	if idx, ok := cache["name"]; ok {
+		f := rv.Field(idx)
+
+		if err := setValue(f, d.Name); err != nil {
+				return fmt.Errorf("%s: set value: %w", op, err)
+		}
+	}
+
 	if len(cache) <= 0 {
 		return fmt.Errorf("%s: cache fields: zero fields", op)
 	}
@@ -40,23 +48,33 @@ func Unmarshal(d scanner.Data, v any) error {
 			f := rv.Field(idx)
 			val = bytes.TrimSpace(val)
 
-			switch f.Kind() {
-			case reflect.String:
-				f.SetString(string(val))
-			case reflect.Int, reflect.Int64:
-				i, err := strconv.ParseInt(string(val), 10, 64)
-				if err != nil {
-					return fmt.Errorf("%s: cannot parse int: %w", op, err)
-				}
-				f.SetInt(int64(i))
-			case reflect.Slice:
-				if f.Type().Elem().Kind() == reflect.Uint8 {
-					f.SetBytes(val)
-				}
-			default:
-				return fmt.Errorf("%s: unsupported type: %v", op, f.Kind())
+			if err := setValue(f, val); err != nil {
+				return fmt.Errorf("%s: set value: %w", op, err)
 			}
 		}
+	}
+
+	return nil
+}
+
+func setValue(v reflect.Value, val []byte) error {
+	const op = "core.setValue"
+
+	switch v.Kind() {
+	case reflect.String:
+		v.SetString(string(val))
+	case reflect.Int, reflect.Int64:
+		i, err := strconv.ParseInt(string(val), 10, 64)
+		if err != nil {
+			return fmt.Errorf("%s: cannot parse int: %w", op, err)
+		}
+		v.SetInt(int64(i))
+	case reflect.Slice:
+		if v.Type().Elem().Kind() == reflect.Uint8 {
+			v.SetBytes(val)
+		}
+	default:
+		return fmt.Errorf("%s: unsupported type: %v", op, v.Kind())
 	}
 
 	return nil

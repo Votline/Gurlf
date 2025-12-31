@@ -35,6 +35,7 @@ func TestUnmarshal(t *testing.T) {
 	}
 
 	res := struct {
+		Name string `gurlf:"name"`
 		ID   int    `gurlf:"ID"`
 		User string `gurlf:"User"`
 		Enc  string `gurlf:"Encoder"`
@@ -45,20 +46,19 @@ func TestUnmarshal(t *testing.T) {
 	}
 
 	tests := []struct{
-		name string
-		actual string
 		expected string
+		actual   string
 	}{
-		{"ID", fmt.Sprint(res.ID), "12"},
-		{"User", res.User, "admin"},
-		{"Enc", res.Enc, "console"},
+		{"12", fmt.Sprint(res.ID)},
+		{"admin", res.User},
+		{"console", res.Enc},
+		{"config", res.Name},
 	}
 
-
-	for _, tt := range tests {
-		if tt.expected != tt.actual {
-			t.Errorf("%s: expected %s, got %s",
-				tt.name, tt.expected, tt.actual)
+	for i, tt := range tests {
+		if tt.actual != tt.expected {
+			t.Errorf("[%d]: expected %q, got %q",
+				i, tt.expected, tt.actual)
 		}
 	}
 }

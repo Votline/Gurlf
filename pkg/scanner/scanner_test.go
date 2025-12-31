@@ -35,11 +35,11 @@ func TestEmit(t *testing.T) {
 		val := cfgData[ent.ValStart : ent.ValEnd]
 
 		if string(key) != tests[i].key {
-			t.Errorf("[%d] key mismatch: expected %s, got %s",
+			t.Errorf("[%d] key mismatch: expected %q, got %q",
 				i, tests[i].key, string(key))
 		}
 		if string(val) != tests[i].val {
-			t.Errorf("[%d] value mismatch: expected %s, got %s",
+			t.Errorf("[%d] value mismatch: expected %q, got %q",
 				i, tests[i].val, string(val))
 		}
 
@@ -96,7 +96,7 @@ func TestFindStart(t *testing.T) {
 		}
 
 		if string(actName) != tt.expName {
-			t.Errorf("[%d]: expected %s, got %s",
+			t.Errorf("[%d]: expected %q, got %q",
 				i, tt.expName, string(actName))
 		}
 		if actIdx != tt.expIdx {
@@ -158,7 +158,8 @@ func TestFindKeyValue(t *testing.T) {
 	}{
 		{"ID: 115\n", "ID", "115"},
 		{"Hdrs: Content-type\n", "Hdrs", "Content-type"},
-		{"Body: `115 road`\n", "Body", "115 road"},
+		{"Body: `115 road\n`", "Body", "115 road\n"},
+		{"Cks: `Maref`", "Cks", "Maref"},
 	}
 
 	for i, tt := range tests {
@@ -172,33 +173,12 @@ func TestFindKeyValue(t *testing.T) {
 		actVal := string(tt.input[vS:vE])
 
 		if actKey != tt.expKey {
-			t.Errorf("[%d]: expected idx %s, got %s",
+			t.Errorf("[%d]: expected idx %q, got %q",
 				i, tt.expKey, actKey)
 		}
 		if actVal != tt.expVal {
-			t.Errorf("[%d]: expected cons %s, got %s",
+			t.Errorf("[%d]: expected cons %q, got %q",
 				i, tt.expVal, actVal)
-		}
-	}
-}
-
-func TestFindByQuote(t *testing.T) {
-	tests := []struct {
-		input   string
-		expValE int
-	}{
-		{"soup`", 4}, {"Ma$ve\n`", 6}, {"\t\t\n\testin`", 9},
-	}
-
-	for i, tt := range tests {
-		vE, err := findByQuote([]byte(tt.input))
-		if err != nil {
-			t.Fatalf("[%d]: unexpected error: %v", i, err)
-		}
-
-		if vE != tt.expValE {
-			t.Errorf("[%d]: expected %d, got %d",
-				i, tt.expValE, vE)
 		}
 	}
 }

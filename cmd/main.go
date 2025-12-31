@@ -58,5 +58,5 @@ func main() {
 		log.Error("Unmarshal failed", zap.Error(err))
 	}
 
-	fmt.Printf("\n%s\n%s\n%s\n", s.ID, s.Body, s.Hdrs)
+	fmt.Printf("\n%d\n%s\n%s\n", s.ID, s.Body, s.Hdrs)
 }
