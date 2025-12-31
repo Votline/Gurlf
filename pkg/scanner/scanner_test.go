@@ -11,11 +11,10 @@ func TestEmit(t *testing.T) {
 		Project: WhereBear
 	`)
 
-	type expected struct {
+	tests := []struct{
 		key string
 		val string
-	}
-	tests := []expected{
+	}{
 		{"ID", "15"},
 		{"User", "dev"},
 		{"Project", "WhereBear"},
@@ -23,7 +22,7 @@ func TestEmit(t *testing.T) {
 
 	enrs, err := emit(cfgData)
 	if err != nil {
-		t.Fatal("Emit error: ", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if len(enrs) != len(tests) {
@@ -44,5 +43,162 @@ func TestEmit(t *testing.T) {
 				i, tests[i].val, string(val))
 		}
 
+	}
+}
+
+func TestFindConfigs(t *testing.T) {
+	cfgData := []byte(`
+		[config]
+		ID: 15
+		[\config]
+		[sec]
+		ID: 21
+		[\sec]
+	`)
+
+	res, err := findConfigs(cfgData, func(b []byte) ([]Entry, error) {return nil, nil})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(res) != 2 {
+		t.Errorf("len mismatch: expected %d, got %d", 2, len(res))
+	}
+}
+
+func TestFindStart(t *testing.T) {
+	tests := []struct{
+		expName string
+		expIdx int
+		input string
+	}{
+		{
+			expName: "config",
+			expIdx: 8,
+			input: "[config] hello",
+		},
+		{
+			expName: "new_config",
+			expIdx: 12,
+			input: "[new_config] hello",
+		},
+		{
+			expName: "third$ config",
+			expIdx: 15,
+			input: "[third$ config] hello",
+		},
+	}
+
+	for i, tt := range tests {
+		actName, actIdx, err := findStart([]byte(tt.input))
+		if err != nil && actIdx == -1 {
+			t.Fatalf("[%d]: unexpected error: %v", i, err)
+		}
+
+		if string(actName) != tt.expName {
+			t.Errorf("[%d]: expected %s, got %s",
+				i, tt.expName, string(actName))
+		}
+		if actIdx != tt.expIdx {
+			t.Errorf("[%d]: expected %d, got %d",
+				i, tt.expIdx, actIdx)
+		}
+	}
+}
+
+func TestFindEnd(t *testing.T) {
+	tests := []struct{
+		expIdx int
+		expCons int
+		input string
+		name string
+	}{
+		{
+			name: "config",
+			expIdx: 5,
+			expCons: 14,
+			input: `some [\config]`,
+		},
+		{
+			name: "new_config",
+			expIdx: 4,
+			expCons: 17,
+			input: `sym [\new_config]`,
+		},
+		{
+			name: "third$ config",
+			expIdx: 5,
+			expCons: 21,
+			input: `bols [\third$ config]`,
+		},
+	}
+
+	for i, tt := range tests {
+		actIdx, actCons, err := findEnd([]byte(tt.name), []byte(tt.input))
+		if err != nil && i <= len(tests) {
+			t.Fatalf("[%d]: unexpected error: %v", i, err)
+		}
+
+		if actIdx != tt.expIdx {
+			t.Errorf("[%d]: expected idx %d, got %d",
+				i, tt.expIdx, actIdx)
+		}
+		if actCons != tt.expCons {
+			t.Errorf("[%d]: expected cons %d, got %d",
+				i, tt.expCons, actCons)
+		}
+	}
+}
+
+func TestFindKeyValue(t *testing.T) {
+	tests := []struct{
+		input string
+		expKey string
+		expVal string
+	}{
+		{"ID: 115\n", "ID", "115"},
+		{"Hdrs: Content-type\n", "Hdrs", "Content-type"},
+		{"Body: `115 road`\n", "Body", "115 road"},
+	}
+
+	for i, tt := range tests {
+		kS, kE, vS, vE, _, err := findKeyValue([]byte(tt.input))
+	
+		if err != nil {
+			t.Fatalf("[%d]: unexpected error: %v", i, err)
+		}
+		
+		actKey := string(tt.input[kS:kE])
+		actVal := string(tt.input[vS:vE])
+
+		if actKey != tt.expKey {
+			t.Errorf("[%d]: expected idx %s, got %s",
+				i, tt.expKey, actKey)
+		}
+		if actVal != tt.expVal {
+			t.Errorf("[%d]: expected cons %s, got %s",
+				i, tt.expVal, actVal)
+		}
+	}
+}
+
+func TestFindByQuote(t *testing.T) {
+	tests := []struct {
+		input   string
+		expValE int
+	}{
+		{"soup`", 4}, {"Ma$ve\n`", 6}, {"\t\t\n\testin`", 9},
+	}
+
+	for i, tt := range tests {
+		vE, err := findByQuote([]byte(tt.input))
+		if err != nil {
+			t.Fatalf("[%d]: unexpected error: %v", i, err)
+		}
+
+		if vE != tt.expValE {
+			t.Errorf("[%d]: expected %d, got %d",
+				i, tt.expValE, vE)
+		}
 	}
 }

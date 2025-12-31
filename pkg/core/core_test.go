@@ -56,9 +56,9 @@ func TestUnmarshal(t *testing.T) {
 
 
 	for _, tt := range tests {
-		if tt.actual != tt.expected {
+		if tt.expected != tt.actual {
 			t.Errorf("%s: expected %s, got %s",
-				tt.name, tt.actual, tt.expected)
+				tt.name, tt.expected, tt.actual)
 		}
 	}
 }
