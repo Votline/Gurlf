@@ -1,10 +1,10 @@
 package core
 
 import (
-	"bytes"
 	"fmt"
 	"reflect"
 	"strconv"
+	"bytes"
 
 	"github.com/Votline/Gurlf/pkg/scanner"
 )
@@ -78,4 +78,43 @@ func setValue(v reflect.Value, val []byte) error {
 	}
 
 	return nil
+}
+
+func Marshal(v any) ([]byte, error) {
+	const op = "core.Marshal"
+
+	rv := reflect.ValueOf(v)
+	if rv.Kind() == reflect.Pointer {
+		rv = rv.Elem()
+	}
+
+	if rv.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("%s: invalid value: need struct, but got %q",
+			op, rv.Kind())
+	}
+
+	rt := rv.Type()
+	m := make(map[string]any, rv.NumField())
+	for i := range rv.NumField() {
+		fieldT := rt.Field(i)
+		fieldV := rv.Field(i)
+
+		if !fieldV.CanInterface() { continue }
+
+		key := fieldT.Tag.Get("gurlf")
+		if key == "" { key = fieldT.Name }
+
+		m[key] = fieldV.Interface()
+	}
+
+	var b bytes.Buffer
+	for k, v := range m {
+		b.WriteString(k)
+		b.WriteByte(':')
+		b.WriteString(fmt.Sprint(v))
+		b.WriteByte('\n')
+	}
+	res := b.Bytes()
+	
+	return res, nil
 }
