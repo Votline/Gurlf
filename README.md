@@ -45,6 +45,7 @@ MULTILINE_KEY: `
 
 ## Example
 
+```bash
 [request_1]
 ID: 1
 HEADERS: Content-Type: application/json
@@ -53,7 +54,7 @@ BODY: `
 `
 COOKIE: session=abc123; path=/; domain=example.com
 [\request_1]
-
+```
 ---
 
 ## Features
@@ -71,10 +72,11 @@ COOKIE: session=abc123; path=/; domain=example.com
 
 ### As a Go Library
 
+```go
 import "github.com/Votline/Gurlf"
 
 // Scan config file
-data, err := gurlf.Scan("config.gurlf")
+data, err := gurlf.ScanFile("config.gurlf")
 if err != nil {
     log.Fatal(err)
 }
@@ -85,6 +87,7 @@ type Config struct {
     Body    string `gurlf:"BODY"`
     Headers string `gurlf:"HEADERS"`
     Cookie  string `gurlf:"COOKIE"`
+    Name    string `gurlf:"config_name"` //tag for the config name without brackets: [config_name]
 }
 
 var cfg Config
@@ -92,6 +95,7 @@ err = gurlf.Unmarshal(data[0], &cfg)
 if err != nil {
     log.Fatal(err)
 }
+```
 
 ---
 
