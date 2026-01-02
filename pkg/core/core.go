@@ -118,7 +118,7 @@ func Marshal(v any) ([]byte, error) {
 	name := m["config_name"]
 	delete(m, "config_name")
 	var b bytes.Buffer
-	if err := writeName(nil, name, &b); err != nil {
+	if err := writeName([]byte("["), name, &b); err != nil {
 		return nil, err
 	}
 	for k, v := range m {
@@ -127,7 +127,7 @@ func Marshal(v any) ([]byte, error) {
 		b.WriteString(fmt.Sprint(v))
 		b.WriteByte('\n')
 	}
-	if err := writeName([]byte(`\`), name, &b); err != nil {
+	if err := writeName([]byte(`[\`), name, &b); err != nil {
 		return nil, err
 	}
 	res := b.Bytes()
@@ -143,16 +143,20 @@ func writeName(prefix []byte, n any, b *bytes.Buffer) error {
 		if val == "" { return nil }
 		b.Write(prefix)
 		b.WriteString(val)
+		b.Write([]byte("]\n"))
 	case []byte:
 		if len(val) == 0 { return nil }
 		b.Write(prefix)
 		b.Write(val)
+		b.Write([]byte("]\n"))
 	case int:
 		b.Write(prefix)
 		b.WriteString(strconv.Itoa(val))
+		b.Write([]byte("]\n"))
 	case rune:
 		b.Write(prefix)
 		b.WriteRune(val)
+		b.Write([]byte("]\n"))
 	case nil:
 		return nil
 	default:
