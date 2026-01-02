@@ -1,10 +1,11 @@
 package core
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
 	"strconv"
-	"bytes"
+	"unsafe"
 
 	"github.com/Votline/Gurlf/pkg/scanner"
 )
@@ -62,9 +63,11 @@ func setValue(v reflect.Value, val []byte) error {
 
 	switch v.Kind() {
 	case reflect.String:
-		v.SetString(string(val))
+		str := unsafe.String(unsafe.SliceData(val), len(val))
+		v.SetString(str)
 	case reflect.Int, reflect.Int64:
-		i, err := strconv.ParseInt(string(val), 10, 64)
+		str := unsafe.String(unsafe.SliceData(val), len(val))
+		i, err := strconv.ParseInt(str, 10, 64)
 		if err != nil {
 			return fmt.Errorf("%s: cannot parse int: %w", op, err)
 		}

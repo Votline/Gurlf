@@ -3,7 +3,6 @@ package scanner
 import (
 	"bytes"
 	"fmt"
-	"os"
 )
 
 type Entry struct {
@@ -17,13 +16,8 @@ type Data struct {
 	Entries []Entry
 }
 
-func Scan(p string) ([]Data, error) {
+func Scan(d []byte) ([]Data, error) {
 	const op = "scanner.Scan"
-
-	d, err := os.ReadFile(p)
-	if err != nil {
-		return nil, fmt.Errorf("%s: read file: %w", op, err)
-	}
 
 	cfgs, err := processFile(d)
 	if err != nil {

@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -30,10 +31,10 @@ func initLogger(d *bool) *zap.Logger {
 }
 
 func main() {
-	d := flag.Bool("debug", false, "use for debug mode")
+	debug := flag.Bool("debug", false, "use for debug mode")
 	flag.Parse()
 
-	log := initLogger(d)
+	log := initLogger(debug)
 
 	args := flag.Args()
 	if len(args) < 1 {
@@ -41,8 +42,13 @@ func main() {
 		return
 	}
 	p := args[0]
+
+	d, err := os.ReadFile(p)
+	if err != nil {
+		log.Fatal("Failed to read file", zap.Error(err))
+	}
 	
-	data, err := gurlf.Scan(p)
+	data, err := gurlf.Scan(d)
 	if err != nil {
 		log.Error("Scan failed", zap.Error(err))
 	}
