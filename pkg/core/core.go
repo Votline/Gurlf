@@ -30,7 +30,7 @@ func Unmarshal(d scanner.Data, v any) error {
 		}
 	}
 
-	if idx, ok := cache["name"]; ok {
+	if idx, ok := cache["config_name"]; ok {
 		f := rv.Field(idx)
 
 		if err := setValue(f, d.Name); err != nil {
@@ -115,16 +115,51 @@ func Marshal(v any) ([]byte, error) {
 		m[key] = fieldV.Interface()
 	}
 
+	name := m["config_name"]
+	delete(m, "config_name")
 	var b bytes.Buffer
+	if err := writeName(nil, name, &b); err != nil {
+		return nil, err
+	}
 	for k, v := range m {
 		b.WriteString(k)
 		b.WriteByte(':')
 		b.WriteString(fmt.Sprint(v))
 		b.WriteByte('\n')
 	}
+	if err := writeName([]byte(`\`), name, &b); err != nil {
+		return nil, err
+	}
 	res := b.Bytes()
 
 	return res, nil
+}
+
+func writeName(prefix []byte, n any, b *bytes.Buffer) error {
+	const op = "core.writeName"
+
+	switch val := n.(type){
+	case string:
+		if val == "" { return nil }
+		b.Write(prefix)
+		b.WriteString(val)
+	case []byte:
+		if len(val) == 0 { return nil }
+		b.Write(prefix)
+		b.Write(val)
+	case int:
+		b.Write(prefix)
+		b.WriteString(strconv.Itoa(val))
+	case rune:
+		b.Write(prefix)
+		b.WriteRune(val)
+	case nil:
+		return nil
+	default:
+		return fmt.Errorf("%s: unsupported type: %v", op, val)
+	}
+
+	return nil
 }
 
 func Encode(wr io.Writer, d []byte) error {

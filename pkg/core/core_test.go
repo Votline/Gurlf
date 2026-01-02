@@ -38,7 +38,7 @@ func TestUnmarshal(t *testing.T) {
 	}
 
 	res := struct {
-		Name string `gurlf:"name"`
+		Name string `gurlf:"config_name"`
 		ID   int    `gurlf:"ID"`
 		User string `gurlf:"User"`
 		Enc  string `gurlf:"Encoder"`

@@ -24,6 +24,10 @@ func Unmarshal(d scanner.Data, v any) error {
 	return core.Unmarshal(d, v)
 }
 
+func Marshal(v any) ([]byte, error) {
+	return core.Marshal(v)
+}
+
 func Encode(wr io.Writer, d []byte) error {
 	return core.Encode(wr, d)
 }
