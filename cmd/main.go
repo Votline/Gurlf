@@ -47,14 +47,14 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to read file", zap.Error(err))
 	}
-	
+
 	data, err := gurlf.Scan(d)
 	if err != nil {
 		log.Error("Scan failed", zap.Error(err))
 	}
 
-	s := struct{
-		ID int `gurlf:"ID"`
+	s := struct {
+		ID   int    `gurlf:"ID"`
 		Body string `gurlf:"BODY"`
 		Hdrs string `gurlf:"HEADERS"`
 	}{}

@@ -1,8 +1,9 @@
 package core
 
 import (
-	"reflect"
+	"bytes"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -47,7 +48,7 @@ func TestUnmarshal(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	tests := []struct{
+	tests := []struct {
 		expected string
 		actual   string
 	}{
@@ -106,6 +107,30 @@ func TestMarshal(t *testing.T) {
 
 		if !reflect.DeepEqual(got, tt.want) {
 			t.Errorf("[%d]:\n Got: %v\nWant: %v", i, got, tt.want)
+		}
+	}
+}
+
+func TestEncode(t *testing.T) {
+	tests := []struct {
+		input string
+	}{
+		{"ID: 15\nBody:15\t21\n\n"},
+	}
+
+	for i, tt := range tests {
+		buf := new(bytes.Buffer)
+		if err := Encode(buf, []byte(tt.input)); err != nil {
+			t.Fatalf("[%d]: unexpected error: %v", i, err)
+		}
+		if buf.String() != tt.input {
+			t.Errorf("[%d]: expected %q, got %q",
+				i, buf.String(), tt.input)
+		}
+		if buf.Len() != len(tt.input) {
+			t.Errorf("[%d]: expected len %d, got %d",
+				i, buf.Len(), len(tt.input))
+
 		}
 	}
 }

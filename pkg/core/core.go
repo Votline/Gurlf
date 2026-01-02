@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"reflect"
 	"strconv"
 	"unsafe"
@@ -33,7 +34,7 @@ func Unmarshal(d scanner.Data, v any) error {
 		f := rv.Field(idx)
 
 		if err := setValue(f, d.Name); err != nil {
-				return fmt.Errorf("%s: set value: %w", op, err)
+			return fmt.Errorf("%s: set value: %w", op, err)
 		}
 	}
 
@@ -102,10 +103,14 @@ func Marshal(v any) ([]byte, error) {
 		fieldT := rt.Field(i)
 		fieldV := rv.Field(i)
 
-		if !fieldV.CanInterface() { continue }
+		if !fieldV.CanInterface() {
+			continue
+		}
 
 		key := fieldT.Tag.Get("gurlf")
-		if key == "" { key = fieldT.Name }
+		if key == "" {
+			key = fieldT.Name
+		}
 
 		m[key] = fieldV.Interface()
 	}
@@ -118,6 +123,11 @@ func Marshal(v any) ([]byte, error) {
 		b.WriteByte('\n')
 	}
 	res := b.Bytes()
-	
+
 	return res, nil
+}
+
+func Encode(wr io.Writer, d []byte) error {
+	_, err := wr.Write(d)
+	return err
 }

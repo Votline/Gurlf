@@ -11,7 +11,7 @@ func TestEmit(t *testing.T) {
 		Project: WhereBear
 	`)
 
-	tests := []struct{
+	tests := []struct {
 		key string
 		val string
 	}{
@@ -30,9 +30,11 @@ func TestEmit(t *testing.T) {
 	}
 
 	for i, ent := range enrs {
-		if i >= len(tests) { break }
-		key := cfgData[ent.KeyStart : ent.KeyEnd]
-		val := cfgData[ent.ValStart : ent.ValEnd]
+		if i >= len(tests) {
+			break
+		}
+		key := cfgData[ent.KeyStart:ent.KeyEnd]
+		val := cfgData[ent.ValStart:ent.ValEnd]
 
 		if string(key) != tests[i].key {
 			t.Errorf("[%d] key mismatch: expected %q, got %q",
@@ -56,7 +58,7 @@ func TestFindConfigs(t *testing.T) {
 		[\sec]
 	`)
 
-	res, err := findConfigs(cfgData, func(b []byte) ([]Entry, error) {return nil, nil})
+	res, err := findConfigs(cfgData, func(b []byte) ([]Entry, error) { return nil, nil })
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -67,25 +69,25 @@ func TestFindConfigs(t *testing.T) {
 }
 
 func TestFindStart(t *testing.T) {
-	tests := []struct{
+	tests := []struct {
 		expName string
-		expIdx int
-		input string
+		expIdx  int
+		input   string
 	}{
 		{
 			expName: "config",
-			expIdx: 8,
-			input: "[config] hello",
+			expIdx:  8,
+			input:   "[config] hello",
 		},
 		{
 			expName: "new_config",
-			expIdx: 12,
-			input: "[new_config] hello",
+			expIdx:  12,
+			input:   "[new_config] hello",
 		},
 		{
 			expName: "third$ config",
-			expIdx: 15,
-			input: "[third$ config] hello",
+			expIdx:  15,
+			input:   "[third$ config] hello",
 		},
 	}
 
@@ -107,29 +109,29 @@ func TestFindStart(t *testing.T) {
 }
 
 func TestFindEnd(t *testing.T) {
-	tests := []struct{
-		expIdx int
+	tests := []struct {
+		expIdx  int
 		expCons int
-		input string
-		name string
+		input   string
+		name    string
 	}{
 		{
-			name: "config",
-			expIdx: 5,
+			name:    "config",
+			expIdx:  5,
 			expCons: 14,
-			input: `some [\config]`,
+			input:   `some [\config]`,
 		},
 		{
-			name: "new_config",
-			expIdx: 4,
+			name:    "new_config",
+			expIdx:  4,
 			expCons: 17,
-			input: `sym [\new_config]`,
+			input:   `sym [\new_config]`,
 		},
 		{
-			name: "third$ config",
-			expIdx: 5,
+			name:    "third$ config",
+			expIdx:  5,
 			expCons: 21,
-			input: `bols [\third$ config]`,
+			input:   `bols [\third$ config]`,
 		},
 	}
 
@@ -151,8 +153,8 @@ func TestFindEnd(t *testing.T) {
 }
 
 func TestFindKeyValue(t *testing.T) {
-	tests := []struct{
-		input string
+	tests := []struct {
+		input  string
 		expKey string
 		expVal string
 	}{
@@ -164,11 +166,11 @@ func TestFindKeyValue(t *testing.T) {
 
 	for i, tt := range tests {
 		kS, kE, vS, vE, _, err := findKeyValue([]byte(tt.input))
-	
+
 		if err != nil {
 			t.Fatalf("[%d]: unexpected error: %v", i, err)
 		}
-		
+
 		actKey := string(tt.input[kS:kE])
 		actVal := string(tt.input[vS:vE])
 
