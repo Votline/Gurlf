@@ -134,3 +134,71 @@ func TestEncode(t *testing.T) {
 		}
 	}
 }
+
+func TestInlineUnmarshal(t *testing.T) {
+	type Base struct {
+		Enable int `gurlf:"enable"`
+	}
+	type Config struct {
+		Base
+		ID string `gurlf:"id"`
+		Name string `gurlf:"config_name"`
+	}
+	data := scanner.Data{
+		Name: []byte("current"),
+		RawData: []byte("enable:0\nid:115"),
+		Entries: []scanner.Entry{
+			{KeyStart: 0, KeyEnd: 6, ValStart: 7, ValEnd: 8},
+			{KeyStart: 9, KeyEnd: 11, ValStart: 12, ValEnd: 15},
+		},
+	}
+	var cfg Config
+	if err := Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	tests := []struct {
+		expected string
+		actual   string
+	}{
+		{"115", fmt.Sprint(cfg.ID)},
+		{"0", fmt.Sprint(cfg.Enable)},
+		{"current", cfg.Name},
+	}
+
+	for i, tt := range tests {
+		if tt.actual != tt.expected {
+			t.Errorf("[%d]: expected %q, got %q",
+				i, tt.expected, tt.actual)
+		}
+	}
+}
+
+func TestInlineMarshal(t *testing.T) {
+	type Base struct {
+		Version string `gurlf:"v"`
+	}
+	type Config struct{
+		Base
+		ID string `gurlf:"id"`
+		Name string `gurlf:"config_name"`
+	}
+	c := Config{
+		Base: Base{Version: "15"},
+		ID: "current",
+		Name: "cfg",
+	}
+	got, err := Marshal(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	res := string(got)
+	expectedLines := []string{"cfg", "15", "current"}
+	for i, line := range expectedLines {
+		if !bytes.Contains(got, []byte(line)) {
+			t.Errorf("[%d]: expected %q, got %q",
+				i, line, res)
+		}
+	}
+}

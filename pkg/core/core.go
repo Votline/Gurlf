@@ -21,17 +21,15 @@ func Unmarshal(d scanner.Data, v any) error {
 	rv = rv.Elem()
 
 	rt := rv.Type()
-	cache := make(map[string]int, rt.NumField())
-	for i := 0; i < rt.NumField(); i++ {
-		f := rt.Field(i)
-		tag := f.Tag.Get("gurlf")
-		if tag != "" {
-			cache[tag] = i
-		}
+	cache := make(map[string][]int, rt.NumField())
+	fillCache(rt, cache, nil)
+
+	if len(cache) == 0 {
+		return fmt.Errorf("%s: cache fields: zero fields", op)
 	}
 
 	if idx, ok := cache["config_name"]; ok {
-		f := rv.Field(idx)
+		f := rv.FieldByIndex(idx)
 
 		if err := setValue(f, d.Name); err != nil {
 			return fmt.Errorf("%s: set value: %w", op, err)
@@ -47,7 +45,7 @@ func Unmarshal(d scanner.Data, v any) error {
 		val := d.RawData[ent.ValStart:ent.ValEnd]
 
 		if idx, ok := cache[key]; ok {
-			f := rv.Field(idx)
+			f := rv.FieldByIndex(idx)
 			val = bytes.TrimSpace(val)
 
 			if err := setValue(f, val); err != nil {
@@ -57,6 +55,24 @@ func Unmarshal(d scanner.Data, v any) error {
 	}
 
 	return nil
+}
+
+func fillCache(rt reflect.Type, cache map[string][]int, baseIdx []int) {
+	for i := range rt.NumField() {
+		f := rt.Field(i)
+		curIdx := append(append([]int{}, baseIdx...), i)
+
+		if f.Anonymous && f.Type.Kind() == reflect.Struct {
+			fillCache(f.Type, cache, curIdx)
+			continue
+		}
+
+		tag := f.Tag.Get("gurlf")
+		if tag == "" {
+			tag = f.Name
+		}
+		cache[tag] = curIdx
+	}
 }
 
 func setValue(v reflect.Value, val []byte) error {
@@ -97,23 +113,8 @@ func Marshal(v any) ([]byte, error) {
 			op, rv.Kind())
 	}
 
-	rt := rv.Type()
-	m := make(map[string]any, rv.NumField())
-	for i := range rv.NumField() {
-		fieldT := rt.Field(i)
-		fieldV := rv.Field(i)
-
-		if !fieldV.CanInterface() {
-			continue
-		}
-
-		key := fieldT.Tag.Get("gurlf")
-		if key == "" {
-			key = fieldT.Name
-		}
-
-		m[key] = fieldV.Interface()
-	}
+	m := make(map[string]any)
+	fillMap(rv, m)
 
 	name := m["config_name"]
 	delete(m, "config_name")
@@ -133,6 +134,30 @@ func Marshal(v any) ([]byte, error) {
 	res := b.Bytes()
 
 	return res, nil
+}
+
+func fillMap(rv reflect.Value, m map[string]any) {
+	rt := rv.Type()
+	for i := range rv.NumField() {
+		fieldT := rt.Field(i)
+		fieldV := rv.Field(i)
+
+		if !fieldV.CanInterface() {
+			continue
+		}
+
+		if fieldT.Anonymous && fieldV.Kind() == reflect.Struct {
+			fillMap(fieldV, m)
+			continue
+		}
+
+		key := fieldT.Tag.Get("gurlf")
+		if key == "" {
+			key = fieldT.Name
+		}
+
+		m[key] = fieldV.Interface()
+	}
 }
 
 func writeName(prefix []byte, n any, b *bytes.Buffer) error {
