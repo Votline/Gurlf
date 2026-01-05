@@ -82,7 +82,7 @@ func setValue(v reflect.Value, val []byte) error {
 	case reflect.String:
 		str := unsafe.String(unsafe.SliceData(val), len(val))
 		v.SetString(str)
-	case reflect.Int, reflect.Int64:
+	case reflect.Int, reflect.Int32, reflect.Int64:
 		str := unsafe.String(unsafe.SliceData(val), len(val))
 		i, err := strconv.ParseInt(str, 10, 64)
 		if err != nil {
@@ -113,82 +113,70 @@ func Marshal(v any) ([]byte, error) {
 			op, rv.Kind())
 	}
 
-	m := make(map[string]any)
-	fillMap(rv, m)
+	res := make([]byte, 0, 1024)
+	fields := make([]byte, 0, 512)
+	var cfgName []byte
 
-	name := m["config_name"]
-	delete(m, "config_name")
-	var b bytes.Buffer
-	if err := writeName([]byte("["), name, &b); err != nil {
-		return nil, err
+	writeRecursive(rv, &fields, &cfgName)
+
+	if len(cfgName) != 0 {
+		res = append(res, '[')
+		res = append(res, cfgName...)
+		res = append(res, ']', '\n')
 	}
-	for k, v := range m {
-		b.WriteString(k)
-		b.WriteByte(':')
-		b.WriteString(fmt.Sprint(v))
-		b.WriteByte('\n')
+
+	res = append(res, fields...)
+
+	if len(cfgName) != 0 {
+		res = append(res, '[', '\\')
+		res = append(res, cfgName...)
+		res = append(res, ']', '\n')
 	}
-	if err := writeName([]byte(`[\`), name, &b); err != nil {
-		return nil, err
-	}
-	res := b.Bytes()
 
 	return res, nil
 }
 
-func fillMap(rv reflect.Value, m map[string]any) {
+func writeRecursive(rv reflect.Value, dst *[]byte, name *[]byte) {
 	rt := rv.Type()
 	for i := range rv.NumField() {
-		fieldT := rt.Field(i)
-		fieldV := rv.Field(i)
+		fV, fT := rv.Field(i), rt.Field(i)
 
-		if !fieldV.CanInterface() {
+		if !fV.CanInterface() { continue }
+
+		if fT.Anonymous && fV.Kind() == reflect.Struct {
+			writeRecursive(fV, dst, name)
 			continue
 		}
 
-		if fieldT.Anonymous && fieldV.Kind() == reflect.Struct {
-			fillMap(fieldV, m)
+		tag := fT.Tag.Get("gurlf")
+		if tag == "" {
+			tag = fT.Name
+		}
+
+		if tag == "config_name" {
+			tmp := []byte("")
+			*name = appendValue(&tmp, fV)
 			continue
 		}
 
-		key := fieldT.Tag.Get("gurlf")
-		if key == "" {
-			key = fieldT.Name
-		}
-
-		m[key] = fieldV.Interface()
+		*dst = append(*dst, tag...)
+		*dst = append(*dst, ':')
+		*dst = appendValue(dst, fV)
+		*dst = append(*dst, '\n')
 	}
 }
-
-func writeName(prefix []byte, n any, b *bytes.Buffer) error {
-	const op = "core.writeName"
-
-	switch val := n.(type){
-	case string:
-		if val == "" { return nil }
-		b.Write(prefix)
-		b.WriteString(val)
-		b.Write([]byte("]\n"))
-	case []byte:
-		if len(val) == 0 { return nil }
-		b.Write(prefix)
-		b.Write(val)
-		b.Write([]byte("]\n"))
-	case int:
-		b.Write(prefix)
-		b.WriteString(strconv.Itoa(val))
-		b.Write([]byte("]\n"))
-	case rune:
-		b.Write(prefix)
-		b.WriteRune(val)
-		b.Write([]byte("]\n"))
-	case nil:
-		return nil
-	default:
-		return fmt.Errorf("%s: unsupported type: %v", op, val)
+func appendValue(dst *[]byte, v reflect.Value) []byte {
+	switch v.Kind() {
+	case reflect.String:
+		return append(*dst, v.String()...)
+	case reflect.Int, reflect.Int32, reflect.Int64:
+		return strconv.AppendInt(*dst, v.Int(), 10)
+	case reflect.Slice:
+		if v.Type().Elem().Kind() == reflect.Uint8 {
+			return append(*dst, v.Bytes()...)
+		}
 	}
-
-	return nil
+	return fmt.Append(*dst, v.Interface())
 }
 
 func Encode(wr io.Writer, d []byte) error {

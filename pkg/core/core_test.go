@@ -65,6 +65,32 @@ func TestUnmarshal(t *testing.T) {
 		}
 	}
 }
+func BenchmarkUnmarshal(b *testing.B) {
+	raw := []byte("[config]\nID:12\nUser:admin\nEncoder:console\n[\\config]")
+	testData := scanner.Data{
+		Name:    []byte("config"),
+		RawData: raw,
+		Entries: []scanner.Entry{
+			{KeyStart: 10, KeyEnd: 12, ValStart: 13, ValEnd: 15}, // ID
+			{KeyStart: 16, KeyEnd: 20, ValStart: 21, ValEnd: 26}, // User
+			{KeyStart: 27, KeyEnd: 34, ValStart: 35, ValEnd: 42}, // Encoder
+		},
+	}
+	type resStruct struct {
+		Name string `gurlf:"config_name"`
+		ID   int    `gurlf:"ID"`
+		User string `gurlf:"User"`
+		Enc  string `grufl:"Encoder"`
+	}
+
+	b.ResetTimer()
+	for b.Loop() {
+		var res resStruct
+		if err := Unmarshal(testData, &res); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
 
 func TestMarshal(t *testing.T) {
 	type testData struct {
@@ -107,6 +133,21 @@ func TestMarshal(t *testing.T) {
 
 		if !reflect.DeepEqual(got, tt.want) {
 			t.Errorf("[%d]:\n Got: %v\nWant: %v", i, got, tt.want)
+		}
+	}
+}
+func BenchmarkMarshal(b *testing.B) {
+	type testData struct {
+		ID   int `gurlf"ID"`
+		User string `gurlf:"User"`
+	}
+	input := testData{ID: 12, User: "admin"}
+
+	b.ResetTimer()
+	for b.Loop() {
+		_, err := Marshal(input)
+		if err != nil {
+			b.Fatal(err)
 		}
 	}
 }
