@@ -4,6 +4,48 @@ import (
 	"testing"
 )
 
+func TestScan(t *testing.T) {
+	cfgData := []byte(`
+		[config]
+		ID: 15
+		Project: WhereBear
+		[\config]
+		[new config]
+		ID: 45
+		Project: Gurlf
+		[\new config]
+
+	`)
+
+	res, err := Scan(cfgData)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(res) != 2 {
+		t.Errorf("len mismatch: expected %d, got %d", 2, len(res))
+	}
+}
+func BenchmarkScan(b *testing.B) {
+	cfgData := []byte(`
+		[config]
+		ID: 15
+		Project: WhereBear
+		[\config]
+		[new config]
+		ID: 45
+		Project: Gurlf
+		[\new config]
+
+	`)
+
+	for b.Loop() {
+		_, err := Scan(cfgData)
+		if err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+	}
+}
+
 func TestEmit(t *testing.T) {
 	cfgData := []byte(`
 		ID: 15
@@ -20,7 +62,8 @@ func TestEmit(t *testing.T) {
 		{"Project", "WhereBear"},
 	}
 
-	enrs, err := emit(cfgData)
+	b := make([]Entry, 512)
+	enrs, err := emit(cfgData, b)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -47,6 +90,15 @@ func TestEmit(t *testing.T) {
 
 	}
 }
+func BenchmarkEmit(b *testing.B) {
+	cfgData := []byte("ID: 15\nUser: dev\nProject: WhereBear\n")
+	b.ResetTimer()
+	
+	buf := make([]Entry, 512)
+	for i := 0; i < b.N; i++ {
+		_, _ = emit(cfgData, buf)
+	}
+}
 
 func TestFindConfigs(t *testing.T) {
 	cfgData := []byte(`
@@ -58,13 +110,25 @@ func TestFindConfigs(t *testing.T) {
 		[\sec]
 	`)
 
-	res, err := findConfigs(cfgData, func(b []byte) ([]Entry, error) { return nil, nil })
+	eBuf := make([]Entry, 0, 512)
+	dBuf := make([]Data, 0, 512)
+	res, err := findConfigs(cfgData, eBuf, dBuf)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if len(res) != 2 {
 		t.Errorf("len mismatch: expected %d, got %d", 2, len(res))
+	}
+}
+func BenchmarkFindConfigs(b *testing.B) {
+	cfgData := []byte("[config]\nID: 15\n[\\config]\n[sec]\nID: 21\n[\\sec]\n")
+	eBuf := make([]Entry, 0, 512)
+	dBuf := make([]Data, 0, 512)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = findConfigs(cfgData, eBuf, dBuf)
 	}
 }
 
@@ -107,6 +171,15 @@ func TestFindStart(t *testing.T) {
 		}
 	}
 }
+func BenchmarkFindStart(b *testing.B) {
+	input := []byte("[third$ config] hello")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _, _ = findStart(input)
+	}
+}
+
+
 
 func TestFindEnd(t *testing.T) {
 	tests := []struct {
@@ -151,6 +224,14 @@ func TestFindEnd(t *testing.T) {
 		}
 	}
 }
+func BenchmarkFindEnd(b *testing.B) {
+	name := []byte("third$ config")
+	input := []byte("bols [\\third$ config]")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _, _ = findEnd(name, input)
+	}
+}
 
 func TestFindKeyValue(t *testing.T) {
 	tests := []struct {
@@ -182,5 +263,12 @@ func TestFindKeyValue(t *testing.T) {
 			t.Errorf("[%d]: expected cons %q, got %q",
 				i, tt.expVal, actVal)
 		}
+	}
+}
+func BenchmarkFindKeyValue(b *testing.B) {
+	input := []byte("Body: `115 road\n`")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _, _, _, _, _ = findKeyValue(input)
 	}
 }
