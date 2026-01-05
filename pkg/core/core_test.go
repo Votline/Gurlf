@@ -138,10 +138,13 @@ func TestMarshal(t *testing.T) {
 }
 func BenchmarkMarshal(b *testing.B) {
 	type testData struct {
-		ID   int `gurlf"ID"`
-		User string `gurlf:"User"`
+		ID   int    `gurlf"ID"`
+		Role string `gurlf:"Role"`
+		Name string `gurlf:"Name"`
+		Enc  string `gurlf:"Encoder"`
+		Body []byte `gurlf:"Body"`
 	}
-	input := testData{ID: 12, User: "admin"}
+	input := testData{ID: 12, Role: "admin", Name: "Vtl", Enc: "Console", Body: []byte(`he\n\tllo`)}
 
 	b.ResetTimer()
 	for b.Loop() {
@@ -182,11 +185,11 @@ func TestInlineUnmarshal(t *testing.T) {
 	}
 	type Config struct {
 		Base
-		ID string `gurlf:"id"`
+		ID   string `gurlf:"id"`
 		Name string `gurlf:"config_name"`
 	}
 	data := scanner.Data{
-		Name: []byte("current"),
+		Name:    []byte("current"),
 		RawData: []byte("enable:0\nid:115"),
 		Entries: []scanner.Entry{
 			{KeyStart: 0, KeyEnd: 6, ValStart: 7, ValEnd: 8},
@@ -219,14 +222,14 @@ func TestInlineMarshal(t *testing.T) {
 	type Base struct {
 		Version string `gurlf:"v"`
 	}
-	type Config struct{
+	type Config struct {
 		Base
-		ID string `gurlf:"id"`
+		ID   string `gurlf:"id"`
 		Name string `gurlf:"config_name"`
 	}
 	c := Config{
 		Base: Base{Version: "15"},
-		ID: "current",
+		ID:   "current",
 		Name: "cfg",
 	}
 	got, err := Marshal(c)

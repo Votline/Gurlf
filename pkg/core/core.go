@@ -6,9 +6,34 @@ import (
 	"io"
 	"reflect"
 	"strconv"
+	"sync"
 	"unsafe"
 
 	"github.com/Votline/Gurlf/pkg/scanner"
+)
+
+type field struct {
+	tag []byte
+	idx []int
+}
+type marshalField struct {
+	precomputedTag []byte
+	idx            []int
+	isConfigName   bool
+}
+type structCache struct {
+	unmFields []field
+	marFields []marshalField
+	nameIdx   []int
+}
+
+var (
+	cache    sync.Map
+	bufferPool = sync.Pool{
+		New: func() any {
+			return bytes.NewBuffer(make([]byte, 0, 1024))
+		},
+	}
 )
 
 func Unmarshal(d scanner.Data, v any) error {
@@ -19,37 +44,39 @@ func Unmarshal(d scanner.Data, v any) error {
 		return fmt.Errorf("%s: invalid value: need pointer to value", op)
 	}
 	rv = rv.Elem()
-
 	rt := rv.Type()
-	cache := make(map[string][]int, rt.NumField())
-	fillCache(rt, cache, nil)
 
-	if len(cache) == 0 {
-		return fmt.Errorf("%s: cache fields: zero fields", op)
+	var info structCache
+	if val, ok := cache.Load(rt); ok {
+		info = val.(structCache)
+	} else {
+		info.unmFields = make([]field, 0, rt.NumField())
+		fillCache(rt, &info, nil)
+		cache.Store(rt, info)
 	}
 
-	if idx, ok := cache["config_name"]; ok {
-		f := rv.FieldByIndex(idx)
+	if len(info.unmFields) == 0 {
+		return fmt.Errorf("%s: unmFields unmFields: zero unmFields", op)
+	}
 
-		if err := setValue(f, d.Name); err != nil {
+	if info.nameIdx != nil {
+		if err := setValue(rv.FieldByIndex(info.nameIdx), d.Name); err != nil {
 			return fmt.Errorf("%s: set value: %w", op, err)
 		}
 	}
 
-	if len(cache) <= 0 {
-		return fmt.Errorf("%s: cache fields: zero fields", op)
-	}
-
 	for _, ent := range d.Entries {
-		key := string(d.RawData[ent.KeyStart:ent.KeyEnd])
+		key := d.RawData[ent.KeyStart:ent.KeyEnd]
+		if len(key) == 0 {
+			continue
+		}
 		val := d.RawData[ent.ValStart:ent.ValEnd]
 
-		if idx, ok := cache[key]; ok {
-			f := rv.FieldByIndex(idx)
-			val = bytes.TrimSpace(val)
-
-			if err := setValue(f, val); err != nil {
-				return fmt.Errorf("%s: set value: %w", op, err)
+		for _, f := range info.unmFields {
+			if bytes.Equal(f.tag, key) {
+				if err := setValue(rv.FieldByIndex(f.idx), val); err != nil {
+					return fmt.Errorf("%s: set value: %w", op, err)
+				}
 			}
 		}
 	}
@@ -57,13 +84,14 @@ func Unmarshal(d scanner.Data, v any) error {
 	return nil
 }
 
-func fillCache(rt reflect.Type, cache map[string][]int, baseIdx []int) {
+func fillCache(rt reflect.Type, info *structCache, path []int) {
 	for i := range rt.NumField() {
 		f := rt.Field(i)
-		curIdx := append(append([]int{}, baseIdx...), i)
+		path = append(path, i)
 
 		if f.Anonymous && f.Type.Kind() == reflect.Struct {
-			fillCache(f.Type, cache, curIdx)
+			fillCache(f.Type, info, path)
+			path = path[:len(path)-1]
 			continue
 		}
 
@@ -71,7 +99,34 @@ func fillCache(rt reflect.Type, cache map[string][]int, baseIdx []int) {
 		if tag == "" {
 			tag = f.Name
 		}
-		cache[tag] = curIdx
+
+		finalIdx := make([]int, len(path))
+		copy(finalIdx, path)
+
+		if tag == "config_name" {
+			info.nameIdx = finalIdx
+			info.marFields = append(info.marFields, marshalField{
+				idx:          finalIdx,
+				isConfigName: true,
+			})
+			path = path[:len(path)-1]
+			continue
+		}
+
+		info.unmFields = append(info.unmFields, field{
+			tag: []byte(tag),
+			idx: finalIdx,
+		})
+
+		prep := make([]byte, 0, len(tag)+1)
+		prep = append(prep, tag...)
+		prep = append(prep, ':')
+		info.marFields = append(info.marFields, marshalField{
+			precomputedTag: prep,
+			idx:            finalIdx,
+		})
+
+		path = path[:len(path)-1]
 	}
 }
 
@@ -113,70 +168,73 @@ func Marshal(v any) ([]byte, error) {
 			op, rv.Kind())
 	}
 
-	res := make([]byte, 0, 1024)
-	fields := make([]byte, 0, 512)
-	var cfgName []byte
-
-	writeRecursive(rv, &fields, &cfgName)
-
-	if len(cfgName) != 0 {
-		res = append(res, '[')
-		res = append(res, cfgName...)
-		res = append(res, ']', '\n')
-	}
-
-	res = append(res, fields...)
-
-	if len(cfgName) != 0 {
-		res = append(res, '[', '\\')
-		res = append(res, cfgName...)
-		res = append(res, ']', '\n')
-	}
-
-	return res, nil
-}
-
-func writeRecursive(rv reflect.Value, dst *[]byte, name *[]byte) {
 	rt := rv.Type()
-	for i := range rv.NumField() {
-		fV, fT := rv.Field(i), rt.Field(i)
-
-		if !fV.CanInterface() { continue }
-
-		if fT.Anonymous && fV.Kind() == reflect.Struct {
-			writeRecursive(fV, dst, name)
-			continue
-		}
-
-		tag := fT.Tag.Get("gurlf")
-		if tag == "" {
-			tag = fT.Name
-		}
-
-		if tag == "config_name" {
-			tmp := []byte("")
-			*name = appendValue(&tmp, fV)
-			continue
-		}
-
-		*dst = append(*dst, tag...)
-		*dst = append(*dst, ':')
-		*dst = appendValue(dst, fV)
-		*dst = append(*dst, '\n')
+	var info structCache
+	if val, ok := cache.Load(rt); ok {
+		info = val.(structCache)
+	} else {
+		fillCache(rt, &info, nil)
+		cache.Store(rt, info)
 	}
+
+	buf := bufferPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer bufferPool.Put(buf)
+	res := buf.Bytes()
+
+	var nStart, nEnd int
+	for _, f := range info.marFields {
+		fV := rv.FieldByIndex(f.idx)
+		if f.isConfigName {
+			nStart = len(res)
+			res = appendValue(res, fV)
+			nEnd = len(res)
+			continue
+		}
+		res = append(res, f.precomputedTag...)
+		res = appendValue(res, fV)
+		res = append(res, '\n')
+	}
+
+	cfgName := res[nStart:nEnd]
+
+	if len(cfgName) == 0 {
+		final := make([]byte, len(res))
+		copy(final, res)
+		return final, nil
+	}
+
+	finalSize := (len(res) - (nEnd - nStart)) + (len(cfgName) * 2) + 10
+	final := make([]byte, 0, finalSize)
+	final = append(final, '[')
+	final = append(final, cfgName...)
+	final = append(final, ']', '\n')
+	final = append(final, res...)
+	final = append(final, '[', '\\')
+	final = append(final, cfgName...)
+	final = append(final, ']', '\n')
+
+	return final, nil
 }
-func appendValue(dst *[]byte, v reflect.Value) []byte {
+
+func appendValue(dst []byte, v reflect.Value) []byte {
 	switch v.Kind() {
 	case reflect.String:
-		return append(*dst, v.String()...)
-	case reflect.Int, reflect.Int32, reflect.Int64:
-		return strconv.AppendInt(*dst, v.Int(), 10)
+		return append(dst, v.String()...)
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return strconv.AppendInt(dst, v.Int(), 10)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return strconv.AppendInt(dst, v.Int(), 10)
+	case reflect.Float32:
+		return strconv.AppendFloat(dst, v.Float(), 'f', -1, 32)
+	case reflect.Float64:
+		return strconv.AppendFloat(dst, v.Float(), 'f', -1, 64)
 	case reflect.Slice:
 		if v.Type().Elem().Kind() == reflect.Uint8 {
-			return append(*dst, v.Bytes()...)
+			return append(dst, v.Bytes()...)
 		}
 	}
-	return fmt.Append(*dst, v.Interface())
+	return fmt.Append(dst, v.Interface())
 }
 
 func Encode(wr io.Writer, d []byte) error {
