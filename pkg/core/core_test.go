@@ -236,8 +236,18 @@ func TestInlineMarshal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
 	res := string(got)
+
+	if !strings.HasPrefix(res, "[cfg]\n") {
+		t.Errorf("Expected prefix [cfg], got:\n%s", res)
+	}
+	if !strings.HasSuffix(res, "[\\cfg]\n") {
+		t.Errorf("Expected suffix [\\cfg], got:\n%s", res)
+	}
+	if strings.Contains(res, "config_name:") {
+		t.Errorf("Result contains raw config_name field, but shouldn't:\n%s", res)
+	}
+
 	expectedLines := []string{"cfg", "15", "current"}
 	for i, line := range expectedLines {
 		if !bytes.Contains(got, []byte(line)) {

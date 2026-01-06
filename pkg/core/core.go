@@ -143,7 +143,7 @@ func setValue(v reflect.Value, val []byte) error {
 		if err != nil {
 			return fmt.Errorf("%s: cannot parse int: %w", op, err)
 		}
-		v.SetInt(int64(i))
+		v.SetInt(i)
 	case reflect.Slice:
 		if v.Type().Elem().Kind() == reflect.Uint8 {
 			v.SetBytes(val)
@@ -177,26 +177,26 @@ func Marshal(v any) ([]byte, error) {
 		cache.Store(rt, info)
 	}
 
+	var cfgName []byte
+	if info.nameIdx != nil {
+		cfgName = appendValue(nil, rv.FieldByIndex(info.nameIdx))
+	}
+
 	buf := bufferPool.Get().(*bytes.Buffer)
 	buf.Reset()
 	defer bufferPool.Put(buf)
-	res := buf.Bytes()
 
+	res := buf.Bytes()
 	var nStart, nEnd int
 	for _, f := range info.marFields {
 		fV := rv.FieldByIndex(f.idx)
 		if f.isConfigName {
-			nStart = len(res)
-			res = appendValue(res, fV)
-			nEnd = len(res)
 			continue
 		}
 		res = append(res, f.precomputedTag...)
 		res = appendValue(res, fV)
 		res = append(res, '\n')
 	}
-
-	cfgName := res[nStart:nEnd]
 
 	if len(cfgName) == 0 {
 		final := make([]byte, len(res))
@@ -206,10 +206,13 @@ func Marshal(v any) ([]byte, error) {
 
 	finalSize := (len(res) - (nEnd - nStart)) + (len(cfgName) * 2) + 10
 	final := make([]byte, 0, finalSize)
+
 	final = append(final, '[')
 	final = append(final, cfgName...)
 	final = append(final, ']', '\n')
+
 	final = append(final, res...)
+
 	final = append(final, '[', '\\')
 	final = append(final, cfgName...)
 	final = append(final, ']', '\n')
