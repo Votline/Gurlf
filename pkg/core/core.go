@@ -87,9 +87,9 @@ func Unmarshal(d scanner.Data, v any) error {
 func fillCache(rt reflect.Type, info *structCache, path []int) {
 	for i := range rt.NumField() {
 		f := rt.Field(i)
-		path = append(path, i)
 
 		if f.Anonymous && f.Type.Kind() == reflect.Struct {
+			path = append(path, i)
 			fillCache(f.Type, info, path)
 			path = path[:len(path)-1]
 			continue
@@ -97,8 +97,9 @@ func fillCache(rt reflect.Type, info *structCache, path []int) {
 
 		tag := f.Tag.Get("gurlf")
 		if tag == "" {
-			tag = f.Name
+			continue
 		}
+		path = append(path, i)
 
 		finalIdx := make([]int, len(path))
 		copy(finalIdx, path)
@@ -189,6 +190,10 @@ func Marshal(v any) ([]byte, error) {
 	res := buf.Bytes()
 	var nStart, nEnd int
 	for _, f := range info.marFields {
+		if rv.Kind() == reflect.Pointer {
+			rv = rv.Elem()
+		}
+
 		fV := rv.FieldByIndex(f.idx)
 		if f.isConfigName {
 			continue

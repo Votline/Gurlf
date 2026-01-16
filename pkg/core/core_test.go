@@ -138,7 +138,7 @@ func TestMarshal(t *testing.T) {
 }
 func BenchmarkMarshal(b *testing.B) {
 	type testData struct {
-		ID   int    `gurlf"ID"`
+		ID   int    `gurlf:"ID"`
 		Role string `gurlf:"Role"`
 		Name string `gurlf:"Name"`
 		Enc  string `gurlf:"Encoder"`

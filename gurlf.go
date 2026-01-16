@@ -9,7 +9,8 @@ import (
 )
 
 func Scan(d []byte) ([]scanner.Data, error) {
-	return scanner.Scan(d)
+	s := scanner.NewScanner()
+	return s.Scan(d)
 }
 
 func ScanFile(p string) ([]scanner.Data, error) {
@@ -17,7 +18,8 @@ func ScanFile(p string) ([]scanner.Data, error) {
 	if err != nil {
 		return nil, err
 	}
-	return scanner.Scan(d)
+	s := scanner.NewScanner()
+	return s.Scan(d)
 }
 
 func Unmarshal(d scanner.Data, v any) error {

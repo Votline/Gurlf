@@ -16,8 +16,9 @@ func TestScan(t *testing.T) {
 		[\new config]
 
 	`)
+	s := NewScanner()
 
-	res, err := Scan(cfgData)
+	res, err := s.Scan(cfgData)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -37,9 +38,10 @@ func BenchmarkScan(b *testing.B) {
 		[\new config]
 
 	`)
+	s := NewScanner()
 
 	for b.Loop() {
-		_, err := Scan(cfgData)
+		_, err := s.Scan(cfgData)
 		if err != nil {
 			b.Fatalf("unexpected error: %v", err)
 		}
@@ -47,11 +49,7 @@ func BenchmarkScan(b *testing.B) {
 }
 
 func TestEmit(t *testing.T) {
-	cfgData := []byte(`
-		ID: 15
-		User: dev
-		Project: WhereBear
-	`)
+	cfgData := []byte("ID: 15\nUser: dev\nProject: WhereBear\n")
 
 	tests := []struct {
 		key string
@@ -61,74 +59,34 @@ func TestEmit(t *testing.T) {
 		{"User", "dev"},
 		{"Project", "WhereBear"},
 	}
+	s := NewScanner()
 
-	b := make([]Entry, 512)
-	enrs, err := emit(cfgData, b)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	var entries []Entry
+	s.emit(cfgData)
+
+	if len(s.enBuf) != len(tests) {
+		t.Errorf("expected %d entries, got %d", len(tests), len(entries))
 	}
 
-	if len(enrs) != len(tests) {
-		t.Errorf("expected %d entries, got %d", len(tests), len(enrs))
-	}
+	for i, ent := range entries {
+		key := string(cfgData[ent.KeyStart:ent.KeyEnd])
+		val := string(cfgData[ent.ValStart:ent.ValEnd])
 
-	for i, ent := range enrs {
-		if i >= len(tests) {
-			break
+		if key != tests[i].key {
+			t.Errorf("[%d] key mismatch: expected %q, got %q", i, tests[i].key, key)
 		}
-		key := cfgData[ent.KeyStart:ent.KeyEnd]
-		val := cfgData[ent.ValStart:ent.ValEnd]
-
-		if string(key) != tests[i].key {
-			t.Errorf("[%d] key mismatch: expected %q, got %q",
-				i, tests[i].key, string(key))
+		if val != tests[i].val {
+			t.Errorf("[%d] value mismatch: expected %q, got %q", i, tests[i].val, val)
 		}
-		if string(val) != tests[i].val {
-			t.Errorf("[%d] value mismatch: expected %q, got %q",
-				i, tests[i].val, string(val))
-		}
-
 	}
 }
 func BenchmarkEmit(b *testing.B) {
 	cfgData := []byte("ID: 15\nUser: dev\nProject: WhereBear\n")
-	b.ResetTimer()
 	
-	buf := make([]Entry, 512)
-	for i := 0; i < b.N; i++ {
-		_, _ = emit(cfgData, buf)
-	}
-}
-
-func TestFindConfigs(t *testing.T) {
-	cfgData := []byte(`
-		[config]
-		ID: 15
-		[\config]
-		[sec]
-		ID: 21
-		[\sec]
-	`)
-
-	eBuf := make([]Entry, 0, 512)
-	dBuf := make([]Data, 0, 512)
-	res, err := findConfigs(cfgData, eBuf, dBuf)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(res) != 2 {
-		t.Errorf("len mismatch: expected %d, got %d", 2, len(res))
-	}
-}
-func BenchmarkFindConfigs(b *testing.B) {
-	cfgData := []byte("[config]\nID: 15\n[\\config]\n[sec]\nID: 21\n[\\sec]\n")
-	eBuf := make([]Entry, 0, 512)
-	dBuf := make([]Data, 0, 512)
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = findConfigs(cfgData, eBuf, dBuf)
+	s := NewScanner()
+	for b.Loop() {
+		s.enBuf = s.enBuf[:0]
+		s.emit(cfgData)
 	}
 }
 
