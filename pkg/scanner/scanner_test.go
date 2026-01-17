@@ -132,12 +132,10 @@ func TestFindStart(t *testing.T) {
 func BenchmarkFindStart(b *testing.B) {
 	input := []byte("[third$ config] hello")
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _, _ = findStart(input)
+	for b.Loop() {
+		findStart(input)
 	}
 }
-
-
 
 func TestFindEnd(t *testing.T) {
 	tests := []struct {
@@ -186,8 +184,8 @@ func BenchmarkFindEnd(b *testing.B) {
 	name := []byte("third$ config")
 	input := []byte("bols [\\third$ config]")
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _, _ = findEnd(name, input)
+	for b.Loop() {
+		findEnd(name, input)
 	}
 }
 
@@ -226,7 +224,7 @@ func TestFindKeyValue(t *testing.T) {
 func BenchmarkFindKeyValue(b *testing.B) {
 	input := []byte("Body: `115 road\n`")
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _, _, _, _, _ = findKeyValue(input)
+	for b.Loop() {
+		findKeyValue(input)
 	}
 }

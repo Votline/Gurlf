@@ -241,7 +241,7 @@ func TestInlineMarshal(t *testing.T) {
 	if !strings.HasPrefix(res, "[cfg]\n") {
 		t.Errorf("Expected prefix [cfg], got:\n%s", res)
 	}
-	if !strings.HasSuffix(res, "[\\cfg]\n") {
+	if !strings.HasSuffix(res, "[\\cfg]\n\n") {
 		t.Errorf("Expected suffix [\\cfg], got:\n%s", res)
 	}
 	if strings.Contains(res, "config_name:") {

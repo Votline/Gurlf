@@ -148,16 +148,16 @@ func findKeyValue(d []byte) (keyS, keyE, valS, valE int, contentEnd int, err err
 
 	if start+1 < len(d) && d[start] == '`' {
 		vE := bytes.IndexByte(d[start+1:], '`')
-		if valE == -1 {
+		if vE == -1 {
 			return 0, 0, 0, 0, 0,
 				fmt.Errorf("%s: quote end idx: no value end", op)
 		}
 
 		valS, valE = start+1, vE+start+1
-		lineEnd := bytes.IndexByte(d[valE-1:], '\n')
+		lineEnd := bytes.IndexByte(d[valE:], '\n')
 
 		if lineEnd == -1 {
-			return keyS, keyE, valS, valE, vE + start, nil
+			return keyS, keyE, valS, valE, valE, nil
 		}
 
 		return keyS, keyE, valS, valE, valE + lineEnd, nil

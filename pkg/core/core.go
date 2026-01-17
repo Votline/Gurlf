@@ -220,7 +220,7 @@ func Marshal(v any) ([]byte, error) {
 
 	final = append(final, '[', '\\')
 	final = append(final, cfgName...)
-	final = append(final, ']', '\n')
+	final = append(final, ']', '\n', '\n')
 
 	return final, nil
 }
@@ -228,7 +228,14 @@ func Marshal(v any) ([]byte, error) {
 func appendValue(dst []byte, v reflect.Value) []byte {
 	switch v.Kind() {
 	case reflect.String:
-		return append(dst, v.String()...)
+		s := v.String()
+		if needMultiline(s) {
+			dst = append(dst, '`')
+			dst = append(dst, s...)
+			dst = append(dst, '`')
+			return dst
+		}
+		return append(dst, s...)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return strconv.AppendInt(dst, v.Int(), 10)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
@@ -238,11 +245,27 @@ func appendValue(dst []byte, v reflect.Value) []byte {
 	case reflect.Float64:
 		return strconv.AppendFloat(dst, v.Float(), 'f', -1, 64)
 	case reflect.Slice:
-		if v.Type().Elem().Kind() == reflect.Uint8 {
-			return append(dst, v.Bytes()...)
+		b := v.Bytes()
+		s := unsafe.String(unsafe.SliceData(b), len(b))
+		if needMultiline(s) {
+			dst = append(dst, '`')
+			dst = append(dst, s...)
+			dst = append(dst, '`')
+			return dst
 		}
+		return append(dst, s...)
 	}
 	return fmt.Append(dst, v.Interface())
+}
+
+func needMultiline(s string) bool {
+	for i := range len(s) {
+		switch s[i] {
+			case '\n', '\t', '\r', '`':
+				return true
+		}
+	}
+	return false
 }
 
 func Encode(wr io.Writer, d []byte) error {
