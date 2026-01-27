@@ -16,7 +16,10 @@ func TestScan(t *testing.T) {
 		[\new config]
 
 	`)
-	s := NewScanner()
+	s := ScannerPool.Get().(*Scanner)
+	defer ScannerPool.Put(s)
+	s.enBuf = s.enBuf[:0]
+	s.dtBuf = s.dtBuf[:0]
 
 	res, err := s.Scan(cfgData)
 	if err != nil {
@@ -26,6 +29,7 @@ func TestScan(t *testing.T) {
 		t.Errorf("len mismatch: expected %d, got %d", 2, len(res))
 	}
 }
+
 func BenchmarkScan(b *testing.B) {
 	cfgData := []byte(`
 		[config]
@@ -38,7 +42,10 @@ func BenchmarkScan(b *testing.B) {
 		[\new config]
 
 	`)
-	s := NewScanner()
+	s := ScannerPool.Get().(*Scanner)
+	defer ScannerPool.Put(s)
+	s.enBuf = s.enBuf[:0]
+	s.dtBuf = s.dtBuf[:0]
 
 	for b.Loop() {
 		_, err := s.Scan(cfgData)
@@ -59,16 +66,18 @@ func TestEmit(t *testing.T) {
 		{"User", "dev"},
 		{"Project", "WhereBear"},
 	}
-	s := NewScanner()
+	s := ScannerPool.Get().(*Scanner)
+	defer ScannerPool.Put(s)
+	s.enBuf = s.enBuf[:0]
+	s.dtBuf = s.dtBuf[:0]
 
-	var entries []Entry
 	s.emit(cfgData)
 
 	if len(s.enBuf) != len(tests) {
-		t.Errorf("expected %d entries, got %d", len(tests), len(entries))
+		t.Errorf("expected %d entries, got %d", len(tests), len(s.enBuf))
 	}
 
-	for i, ent := range entries {
+	for i, ent := range s.enBuf {
 		key := string(cfgData[ent.KeyStart:ent.KeyEnd])
 		val := string(cfgData[ent.ValStart:ent.ValEnd])
 
@@ -80,10 +89,14 @@ func TestEmit(t *testing.T) {
 		}
 	}
 }
+
 func BenchmarkEmit(b *testing.B) {
 	cfgData := []byte("ID: 15\nUser: dev\nProject: WhereBear\n")
-	
-	s := NewScanner()
+
+	s := ScannerPool.Get().(*Scanner)
+	defer ScannerPool.Put(s)
+	s.enBuf = s.enBuf[:0]
+	s.dtBuf = s.dtBuf[:0]
 	for b.Loop() {
 		s.enBuf = s.enBuf[:0]
 		s.emit(cfgData)
@@ -129,6 +142,7 @@ func TestFindStart(t *testing.T) {
 		}
 	}
 }
+
 func BenchmarkFindStart(b *testing.B) {
 	input := []byte("[third$ config] hello")
 	b.ResetTimer()
@@ -180,6 +194,7 @@ func TestFindEnd(t *testing.T) {
 		}
 	}
 }
+
 func BenchmarkFindEnd(b *testing.B) {
 	name := []byte("third$ config")
 	input := []byte("bols [\\third$ config]")
@@ -199,11 +214,11 @@ func TestFindKeyValue(t *testing.T) {
 		{"Hdrs: Content-type\n", "Hdrs", "Content-type"},
 		{"Body: `115 road\n`", "Body", "115 road\n"},
 		{"Cks: `Maref`", "Cks", "Maref"},
+		{"Body:`\nsomething:\n`else` \n`\n", "Body", "\nsomething:\n`else` \n"},
 	}
 
 	for i, tt := range tests {
 		kS, kE, vS, vE, _, err := findKeyValue([]byte(tt.input))
-
 		if err != nil {
 			t.Fatalf("[%d]: unexpected error: %v", i, err)
 		}
@@ -221,6 +236,7 @@ func TestFindKeyValue(t *testing.T) {
 		}
 	}
 }
+
 func BenchmarkFindKeyValue(b *testing.B) {
 	input := []byte("Body: `115 road\n`")
 	b.ResetTimer()

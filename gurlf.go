@@ -9,7 +9,8 @@ import (
 )
 
 func Scan(d []byte) ([]scanner.Data, error) {
-	s := scanner.NewScanner()
+	s := scanner.ScannerPool.Get().(*scanner.Scanner)
+	defer scanner.ScannerPool.Put(s)
 	return s.Scan(d)
 }
 
@@ -18,7 +19,8 @@ func ScanFile(p string) ([]scanner.Data, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := scanner.NewScanner()
+	s := scanner.ScannerPool.Get().(*scanner.Scanner)
+	defer scanner.ScannerPool.Put(s)
 	return s.Scan(d)
 }
 
