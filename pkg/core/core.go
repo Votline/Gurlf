@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"unsafe"
 
@@ -20,6 +22,7 @@ type marshalField struct {
 	precomputedTag []byte
 	idx            []int
 	isConfigName   bool
+	omitempty      bool
 }
 type structCache struct {
 	unmFields []field
@@ -28,7 +31,7 @@ type structCache struct {
 }
 
 var (
-	cache    sync.Map
+	cache      sync.Map
 	bufferPool = sync.Pool{
 		New: func() any {
 			return bytes.NewBuffer(make([]byte, 0, 1024))
@@ -95,7 +98,7 @@ func fillCache(rt reflect.Type, info *structCache, path []int) {
 			continue
 		}
 
-		tag := f.Tag.Get("gurlf")
+		tag, omitempty := parseTag(f.Tag.Get("gurlf"))
 		if tag == "" {
 			continue
 		}
@@ -109,6 +112,7 @@ func fillCache(rt reflect.Type, info *structCache, path []int) {
 			info.marFields = append(info.marFields, marshalField{
 				idx:          finalIdx,
 				isConfigName: true,
+				omitempty:    omitempty,
 			})
 			path = path[:len(path)-1]
 			continue
@@ -125,14 +129,33 @@ func fillCache(rt reflect.Type, info *structCache, path []int) {
 		info.marFields = append(info.marFields, marshalField{
 			precomputedTag: prep,
 			idx:            finalIdx,
+			omitempty:      omitempty,
 		})
 
 		path = path[:len(path)-1]
 	}
 }
 
+func parseTag(tag string) (string, bool) {
+	omitempty := false
+	parts := strings.Split(tag, ",")
+	if len(parts) == 0 {
+		return "", false
+	}
+
+	if slices.Contains(parts, "omitempty") {
+		omitempty = true
+	}
+
+	return parts[0], omitempty
+}
+
 func setValue(v reflect.Value, val []byte) error {
 	const op = "core.setValue"
+
+	if len(val) == 0 {
+		return nil
+	}
 
 	switch v.Kind() {
 	case reflect.String:
@@ -198,6 +221,11 @@ func Marshal(v any) ([]byte, error) {
 		if f.isConfigName {
 			continue
 		}
+
+		if f.omitempty && fV.IsZero() {
+			continue
+		}
+
 		res = append(res, f.precomputedTag...)
 		res = appendValue(res, fV)
 		res = append(res, '\n')
@@ -261,8 +289,8 @@ func appendValue(dst []byte, v reflect.Value) []byte {
 func needMultiline(s string) bool {
 	for i := range len(s) {
 		switch s[i] {
-			case '\n', '\t', '\r', '`':
-				return true
+		case '\n', '\t', '\r', '`':
+			return true
 		}
 	}
 	return false
